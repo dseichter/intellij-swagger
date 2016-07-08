@@ -6,9 +6,11 @@ import com.google.common.collect.Sets;
 import com.intellij.codeInsight.completion.InsertHandler;
 import com.intellij.codeInsight.lookup.LookupElement;
 import com.intellij.json.psi.JsonArray;
-import com.intellij.json.psi.JsonFile;
+import com.intellij.json.psi.JsonElementGenerator;
 import com.intellij.json.psi.JsonLiteral;
+import com.intellij.json.psi.JsonObject;
 import com.intellij.json.psi.JsonProperty;
+import com.intellij.json.psi.JsonPsiUtil;
 import com.intellij.json.psi.JsonValue;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
@@ -28,35 +30,15 @@ import java.util.stream.Collectors;
 
 public class JsonTraversal extends Traversal {
 
-    @Override
-    public boolean childOfRoot(@NotNull final PsiElement psiElement) {
-        return psiElement.getParent() instanceof JsonFile ||
-                psiElement.getParent().getParent().getParent().getParent() instanceof JsonFile;
-    }
-
-    @Override
     public boolean isKey(final PsiElement psiElement) {
-        final PsiElement firstParent = psiElement.getParent();
-        return Optional.ofNullable(firstParent)
-                .map(PsiElement::getParent)
-                .filter(jsonPropertyCandidate -> jsonPropertyCandidate instanceof JsonProperty)
-                .map(JsonProperty.class::cast)
-                .map(JsonProperty::getNameElement)
-                .filter(nameElement -> nameElement == firstParent)
-                .isPresent();
+        return JsonPsiUtil.isPropertyKey(psiElement.getParent());
     }
 
     @Override
     public Optional<String> getKeyNameIfKey(final PsiElement psiElement) {
-        final PsiElement firstParent = psiElement.getParent();
-        return Optional.ofNullable(firstParent)
-                .map(PsiElement::getParent)
-                .filter(jsonPropertyCandidate -> jsonPropertyCandidate instanceof JsonProperty)
-                .map(JsonProperty.class::cast)
-                .map(JsonProperty::getNameElement)
-                .filter(nameElement -> nameElement == firstParent)
-                .map(JsonValue::getText)
-                .map(StringUtils::removeAllQuotes);
+        return isKey(psiElement)
+                ? Optional.of(StringUtils.removeAllQuotes(psiElement.getParent().getText()))
+                : Optional.empty();
     }
 
     @Override
@@ -103,23 +85,8 @@ public class JsonTraversal extends Traversal {
     }
 
     @Override
-    boolean childOfKeyWithName(final PsiElement psiElement, final String keyName) {
-        if (psiElement == null) {
-            return false;
-        }
-        if (psiElement instanceof JsonProperty) {
-            if (keyName.equals(((JsonProperty) psiElement).getName())) {
-                return true;
-            }
-        }
-        return childOfKeyWithName(psiElement.getParent(), keyName);
-    }
-
-    @Override
-    public List<PsiElement> getChildrenOf(final String propertyName, final PsiFile psiFile) {
-        return getRootChildren(psiFile).stream()
-                .filter(child -> child instanceof JsonProperty)
-                .map(JsonProperty.class::cast)
+    public List<PsiElement> getChildrenOfDefinition(final String propertyName, final PsiFile psiFile) {
+        return getRootChildrenOfType(psiFile, JsonProperty.class).stream()
                 .filter(jsonProperty -> propertyName.equals(jsonProperty.getName()))
                 .findAny()
                 .map(JsonProperty::getValue)
@@ -127,12 +94,49 @@ public class JsonTraversal extends Traversal {
                 .orElse(Lists.newArrayList());
     }
 
+    private boolean hasRootKey(final String propertyName, final PsiFile psiFile) {
+        return getRootChildrenOfType(psiFile, JsonProperty.class).stream()
+                .anyMatch(jsonProperty -> propertyName.equals(jsonProperty.getName()));
+    }
+
     @Override
-    public List<String> getKeyNamesOf(final String propertyName, final PsiFile containingFile) {
-        return getChildrenOf(propertyName, containingFile).stream()
+    public Optional<? extends PsiElement> getRootChildByName(final String propertyName, final PsiFile psiFile) {
+        return getRootChildrenOfType(psiFile, JsonProperty.class).stream()
+                .filter(jsonProperty -> propertyName.equals(jsonProperty.getName()))
+                .findFirst();
+    }
+
+    private <T extends PsiElement> List<T> getRootChildrenOfType(final PsiFile psiFile, final Class<T> type) {
+        final PsiElement[] children = getRootObject(psiFile).map(PsiElement::getChildren).orElse(new PsiElement[0]);
+
+        return Arrays.stream(children)
+                .filter(child -> type.isAssignableFrom(child.getClass()))
+                .map(type::cast)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<String> getKeyNamesOfDefinition(final String propertyName, final PsiFile containingFile) {
+        return getChildrenOfDefinition(propertyName, containingFile).stream()
                 .filter(el -> el instanceof JsonProperty)
                 .map(JsonProperty.class::cast)
                 .map(JsonProperty::getName)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<String> getTagNames(final PsiFile psiFile) {
+        return getRootChildrenOfType(psiFile, JsonProperty.class).stream()
+                .filter(jsonProperty -> "tags".equals(jsonProperty.getName()))
+                .map(JsonProperty::getValue)
+                .map(el -> Arrays.asList(el.getChildren()))
+                .flatMap(Collection::stream)
+                .filter(el -> el instanceof JsonObject)
+                .map(JsonObject.class::cast)
+                .map(jsonObject -> jsonObject.findProperty("name"))
+                .map(JsonProperty::getValue)
+                .map(JsonValue::getText)
+                .map(StringUtils::removeAllQuotes)
                 .collect(Collectors.toList());
     }
 
@@ -172,7 +176,7 @@ public class JsonTraversal extends Traversal {
     }
 
     @Override
-    List<String> getSecurityScopesIfOAuth2(final PsiElement securityDefinitionItem) {
+    public List<String> getSecurityScopesIfOAuth2(final PsiElement securityDefinitionItem) {
         final List<JsonProperty> properties = getChildProperties(securityDefinitionItem);
 
         final boolean isOAuth2 = properties.stream()
@@ -221,16 +225,6 @@ public class JsonTraversal extends Traversal {
     }
 
     @Override
-    boolean elementIsInsideArray(final PsiElement psiElement) {
-        if (psiElement == null) {
-            return false;
-        } else if (psiElement instanceof JsonArray) {
-            return true;
-        }
-        return elementIsInsideArray(psiElement.getParent());
-    }
-
-    @Override
     public boolean elementIsDirectValueOfKey(final PsiElement psiElement, final String... keyNames) {
         final Set<String> targetKeyNames = Sets.newHashSet(keyNames);
         return Optional.ofNullable(psiElement.getParent())
@@ -255,8 +249,33 @@ public class JsonTraversal extends Traversal {
         return lastChildOfParent.equals(child);
     }
 
-    private List<PsiElement> getRootChildren(final PsiFile psiFile) {
-        return Arrays.asList(psiFile.getChildren()[0].getChildren());
+    private Optional<JsonObject> getRootObject(final PsiFile psiFile) {
+        return Arrays.stream(psiFile.getChildren())
+                .filter(el -> el instanceof JsonObject)
+                .map(JsonObject.class::cast)
+                .findFirst();
+    }
+
+    @Override
+    public void addReferenceDefinition(final String referenceType,
+                                       final String referenceValueWithoutPrefix,
+                                       final PsiFile psiFile) {
+        if (hasRootKey(referenceType, psiFile)) {
+            getRootChildByName(referenceType, psiFile)
+                    .map(el -> el.getChildren()[1])
+                    .filter(el -> el instanceof JsonObject)
+                    .map(JsonObject.class::cast)
+                    .ifPresent(jsonObject -> JsonPsiUtil.addProperty(jsonObject,
+                            new JsonElementGenerator(psiFile.getProject())
+                                    .createProperty(referenceValueWithoutPrefix, "{}"),
+                            false));
+        } else {
+            getRootObject(psiFile).ifPresent(jsonObject ->
+                    JsonPsiUtil.addProperty(jsonObject,
+                            new JsonElementGenerator(psiFile.getProject())
+                                    .createProperty(referenceType, "{\"" + referenceValueWithoutPrefix + "\": {}}"),
+                            false));
+        }
     }
 
 }

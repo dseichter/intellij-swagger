@@ -7,7 +7,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.yaml.psi.YAMLPsiElement;
 import org.jetbrains.yaml.psi.YAMLQuotedText;
-import org.zalando.intellij.swagger.reference.element.YamlElementGenerator;
+import org.zalando.intellij.swagger.reference.element.SwaggerYamlElementGenerator;
 import org.zalando.intellij.swagger.traversal.YamlTraversal;
 
 import java.util.List;
@@ -43,7 +43,7 @@ public class YamlParameterReference extends PsiReferenceBase<PsiElement> {
     }
 
     private List<YAMLPsiElement> getParametersChildren() {
-        return yamlTraversal.getChildrenOf("parameters", getElement().getContainingFile()).stream()
+        return yamlTraversal.getChildrenOfDefinition("parameters", getElement().getContainingFile()).stream()
                 .filter(psiElement -> psiElement instanceof YAMLPsiElement)
                 .map(YAMLPsiElement.class::cast)
                 .collect(Collectors.toList());
@@ -51,7 +51,7 @@ public class YamlParameterReference extends PsiReferenceBase<PsiElement> {
 
     @Override
     public PsiElement handleElementRename(String newElementName) throws IncorrectOperationException {
-        final PsiElement newValue = YamlElementGenerator.createSingleQuotedValue(getElement().getProject(), "#/parameters/" + newElementName);
+        final PsiElement newValue = SwaggerYamlElementGenerator.createSingleQuotedValue(getElement().getProject(), "#/parameters/" + newElementName);
         return getElement().replace(newValue);
     }
 }

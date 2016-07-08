@@ -1,7 +1,7 @@
 package org.zalando.intellij.swagger.completion.value;
 
 import com.intellij.codeInsight.completion.CompletionResultSet;
-import org.zalando.intellij.swagger.traversal.CompletionHelper;
+import org.zalando.intellij.swagger.completion.CompletionHelper;
 
 import java.util.Optional;
 
@@ -35,7 +35,9 @@ public class ValueCompletionFactory {
             return Optional.of(new ParametersCollectionFormatValueCompletion(completionHelper, completionResultSet));
         } else if (completionHelper.completeHeadersCollectionFormat()) {
             return Optional.of(new HeadersCollectionFormatValueCompletion(completionHelper, completionResultSet));
-        } else {
+        } else if (completionHelper.completeTagsValue()) {
+            return Optional.of(new TagsValueCompletion(completionHelper, completionResultSet));
+        }else {
             return Optional.empty();
         }
     }

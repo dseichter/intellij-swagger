@@ -2,8 +2,6 @@ package org.zalando.intellij.swagger.file;
 
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.util.io.FileUtil;
-import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.util.Url;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
@@ -33,7 +31,7 @@ public class SwaggerUiCreator {
         }
     }
 
-    public Optional<String> tryToCreateSwaggerUiFiles(final String specificationContent)
+    private Optional<String> tryToCreateSwaggerUiFiles(final String specificationContent)
             throws IOException, URISyntaxException {
         final File tempSwaggerUiDir = copySwaggerUiToTempDir();
 
@@ -53,8 +51,7 @@ public class SwaggerUiCreator {
         return tempSwaggerUiDir;
     }
 
-    private void setSwaggerConfigurationValues(final File swaggerDir, final String specificationContent)
-            throws IOException {
+    private void setSwaggerConfigurationValues(final File swaggerDir, final String specificationContent) {
         fileContentManipulator.setPlaceholderValue(SPECIFICATION_PLACEHOLDER,
                 specificationContent,
                 new File(swaggerDir, "index.html"));

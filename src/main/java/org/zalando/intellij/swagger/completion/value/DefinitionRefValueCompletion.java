@@ -3,7 +3,7 @@ package org.zalando.intellij.swagger.completion.value;
 import com.intellij.codeInsight.completion.CompletionResultSet;
 import org.zalando.intellij.swagger.completion.value.model.StringValue;
 import org.zalando.intellij.swagger.completion.value.model.Value;
-import org.zalando.intellij.swagger.traversal.CompletionHelper;
+import org.zalando.intellij.swagger.completion.CompletionHelper;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -20,7 +20,7 @@ class DefinitionRefValueCompletion extends ValueCompletion {
     }
 
     private List<Value> getDefinitionKeys() {
-        return completionHelper.getKeyNamesOf("definitions").stream()
+        return completionHelper.getKeyNamesOfDefinition("definitions").stream()
                 .map(keyName -> "#/definitions/" + keyName)
                 .map(StringValue::new)
                 .collect(Collectors.toList());
