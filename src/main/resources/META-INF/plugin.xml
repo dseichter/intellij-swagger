@@ -15,14 +15,14 @@
     ]]></description>
 
     <change-notes><![CDATA[
-           version 0.0.16
+           version 0.0.17
            <br/>
            <ul>
            <li>Quick fix option for unknown $ref values</li>
            <li>Tags auto completion</li>
            </ul>
 
-           version 0.0.15
+           version 0.0.14
            <br/>
            <ul>
            <li>Swagger UI</li>
@@ -44,7 +44,7 @@
     </change-notes>
 
     <!-- please see http://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/build_number_ranges.html for description -->
-    <idea-version since-build="162.917" until-build="162.*"/>
+    <idea-version since-build="145"/>
 
     <extensions defaultExtensionNs="com.intellij">
         <completion.contributor language="JSON" implementationClass="org.zalando.intellij.swagger.completion.contributor.SwaggerJsonCompletionContributor"/>
